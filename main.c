@@ -8,6 +8,12 @@
 	The 0xFF in lfuse gives the longest startup time with a crystal
 	Using a 14.745600 MHz crystal.
 
+	Write version name (in eeVer) to eeprom:
+	
+	avrdude -c usbtiny -p ATtiny4313 -P usb -U eeprom:w:main.eep:i
+
+	Do this AFTER you've programmed the flash memory.
+
 */
 
 //#define DEBUG
@@ -15,6 +21,7 @@
 
 #include <avr/io.h>
 #include <avr/wdt.h>
+#include <avr/eeprom.h>
 #include <util/delay.h>
 #include <stdlib.h>						// for atoi()
 #ifdef MCPDEBUG
@@ -32,6 +39,9 @@
 #define TRUE	1
 #define FALSE	0
 
+
+uint8_t EEMEM eeVer[]="PN532 Reader v20131229";
+
 void errMsg(uint8_t);
 void init_ATtiny4313(void);
 uint16_t recvNum(void);
@@ -46,29 +56,13 @@ uint8_t writeMiFare(uint8_t*);
 int main (void)
 {
 
-	uint8_t i, j, cmd, frameBuf[36], cardID[5];
+	uint8_t i, cmd, frameBuf[36], cardID[5];
 
 	init_ATtiny4313();
 
 	usi_twi_master_initialize();
 
-#ifdef MCPDEBUG
-	if (!mcp23008_Init(MCP23008_BASEADDR)) {
-		errMsg(1);
-	}
-#endif
-
-#ifdef PN532DEBUG
-	if (pn532_twi_sendCommand(GETFIRMWAREVERSION, frameBuf, 0)) {
-		for (i = 0; i < 15; i++) {
-			sendNum((int) frameBuf[i], 16);
-			sendByte(' ');
-		}
-	} else {
-		errMsg(2);
-	}
-#endif
-	if (!pn532_twi_sendCommand(SAMCONFIG, frameBuf, 0)) {
+	if (!pn532_twi_sendCommand(SAMCONFIG, frameBuf, 0)) {		// move to an init routine
 		errMsg(15);
 	}
 	if (!	pn532_twi_sendCommand(RFCONFIGURATION, frameBuf, 0)) {
@@ -128,7 +122,7 @@ int main (void)
 #endif
 
 
-				case ('r'):
+				case ('r'):					// Read the first two blocks from the MiFare card (change to a subroutine)
 					brightness(200);
 					pn532_twi_sendCommand(INLISTPASSIVETARGET, frameBuf, 0);
 					if (frameBuf[9]) {
@@ -179,7 +173,7 @@ int main (void)
 					sendNum(itest, 10);
 					break;
 
-				case ('w'):
+				case ('w'):			// Write the first two blocks in the MiFare card
 					writeMiFare(frameBuf);
 					break;
 
@@ -575,6 +569,7 @@ void errMsg(uint8_t msgNum)
 void init_ATtiny4313(void)
 {
 
+	char strBuf[25];
 	uint8_t junk, resetType = 0;
 
 	if (MCUSR & _BV(WDRF)) {	// If there was a watchdog reset...
@@ -622,6 +617,11 @@ void init_ATtiny4313(void)
 		default:
 			break;
 		}
+
+	eeprom_read_block((void*) &strBuf, (const void*) &eeVer, 23);
+//	strBuf[22] = 0x00;
+	sendCRLF();
+	sendString(strBuf);
 
 	brightness(255);
 	_delay_ms(100);
