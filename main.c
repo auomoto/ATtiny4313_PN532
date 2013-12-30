@@ -43,6 +43,7 @@
 uint8_t EEMEM eeVer[]="PN532 Reader v20131229";
 
 void errMsg(uint8_t);
+void getCardID(uint8_t *, uint8_t*);
 void init_ATtiny4313(void);
 uint16_t recvNum(void);
 void sendBlock(uint8_t*, uint8_t);
@@ -120,7 +121,9 @@ int main (void)
 					mcp23008_Write(MCP23008_BASEADDR, GPIO, 0);
 					break;
 #endif
-
+				case ('i'):
+					getCardID(cardID, frameBuf);
+					break;
 
 				case ('r'):					// Read the first two blocks from the MiFare card (change to a subroutine)
 					brightness(200);
@@ -130,10 +133,6 @@ int main (void)
 							cardID[i] = frameBuf[i+15];
 						}
 						sendCRLF();
-//						for (i = 0; i < 4; i++) {
-//							sendNum(cardID[i], 16);
-//						}
-//						sendCRLF();
 						if (pn532_readBlock(cardID, 1, frameBuf)) {;
 							//pn532_writeBlock(cardID, 1, dataBlock, frameBuf);
 							sendBlock(frameBuf, 10);
@@ -185,6 +184,26 @@ int main (void)
 			sendPrompt();
 		}
 	}
+}
+
+void getCardID(uint8_t cardID[], uint8_t frameBuf[])
+{
+
+	uint8_t i;
+
+	pn532_twi_sendCommand(INLISTPASSIVETARGET, frameBuf, 0);
+	if (frameBuf[9]) {
+		for (i = 0; i < 4; i++) {
+			cardID[i] = frameBuf[i+15];
+		}
+		sendCRLF();
+		for (i = 0; i < 4; i++) {
+			sendNum(cardID[i], 16);
+		}
+	} else {
+		errMsg(23);
+	}
+
 }
 
 void sendBlock(uint8_t frameBuf[], uint8_t base)
@@ -240,7 +259,7 @@ uint8_t writeMiFare(uint8_t frameBuf[])
 		errMsg(19);
 		return(FALSE);
 	}
-	if (! pn532_writeBlock(cardID, 2, &buf[15], frameBuf)) {
+	if (! pn532_writeBlock(cardID, 2, &buf[16], frameBuf)) {
 		errMsg(20);
 		return(FALSE);
 	}
@@ -369,6 +388,7 @@ void sendString(char str[])
 	19- Error writing block 1
 	20- Error writing block 2
 	22- PN532 IRQ sent (not error)
+	23- get card id error (no card?)
 
 */
 
