@@ -1,10 +1,11 @@
-#include <avr/io.h>
 #include <util/delay.h>
+#include <avr/io.h>
 
 #define ATTINY4313
 
-#ifdef ATTINY4313			// Lifted from the AVR310 routines
+// Port and pin names lifted from the AVR310 routines
 
+#ifdef ATTINY4313
 #define DDR_USI			DDRB
 #define PORT_USI		PORTB
 #define PIN_USI			PINB
@@ -25,7 +26,7 @@
 #endif
 
 /*
-	Clock (SCL) timing.
+	TWI clock (SCL) timing delays in microseconds.
 	T_LOW is the time to hold SCL low between pulses.
 	T_HIGH is the minimum time needed for reading SDA.
 	T_LOW is also the time required between STOP and START bits.
@@ -41,7 +42,6 @@
 #define T_HIGH	4.0
 #endif
 
-
 /*
 	Function prototypes
 */
@@ -53,9 +53,6 @@ void usi_twi_master_stop(void);
 uint8_t usi_twi_master_transfer(uint8_t nbits);
 void usi_twi_master_receive(uint8_t*, uint8_t);
 
-/*
-	Constants
-*/
 /*
 	USICR_SETUP sets up the USICR (USI Control Register). It's
 	main use is in bit 0, which toggles the SCL line each time
