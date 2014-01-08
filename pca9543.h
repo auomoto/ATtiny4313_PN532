@@ -1,0 +1,1 @@
+#define PCA9543_BASEADDR 0x70		// Shift left one and add r/w bit
