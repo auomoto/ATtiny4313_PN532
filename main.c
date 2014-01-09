@@ -2,49 +2,51 @@
 
 	Check fuses:
 
-	avrdude -c usbtiny -p ATtiny4313 -P usb -U lfuse:r:-:h
+	>avrdude -c usbtiny -p ATtiny4313 -P usb -U lfuse:r:-:h
+
 	Burned new fuses: 0xFF 0xDF 0xFF
 	>avrdude -p ATtiny4313 -c usbtiny -U lfuse:w:0xff:m
 	The 0xFF in lfuse gives the longest startup time with a crystal
-	Using a 14.745600 MHz crystal.
 
-	Write version name (in eeVer) to eeprom:
-	
+	Using a 14.745600 MHz crystal (edit the Makefile).
+
+	Writing the version name (in eeVer) to eeprom:
+
 	avrdude -c usbtiny -p ATtiny4313 -P usb -U eeprom:w:main.eep:i
 
 	Do this AFTER you've programmed the flash memory.
 
+	But I've edited the Makefile to do this automatically.
+
 */
 
-//#define DEBUG
 //#define PN532DEBUG
-
+#include <stdlib.h>						// for atoi()
+#include <util/delay.h>					// AVR/GCC delay routines
 #include <avr/io.h>
 #include <avr/wdt.h>
 #include <avr/eeprom.h>
-#include <util/delay.h>
-#include <stdlib.h>						// for atoi()
-#ifdef MCPDEBUG
-#include "mcp23008.h"					// for debugging
-#endif
 #include "usi_twi_master.h"
+#include "pca9543.h"
 #include "PN532_twi.h"
 
 #define LEDPIN PB2						// PB2 is the pin for OC0A
 #define brightness(X) (OCR0A = X)		// PWM on PB2
 
-#define COMMANDSENT (UCSRA & _BV(RXC))	// Is there something in the RX buffer?
+#define CHARSENT (UCSRA & _BV(RXC))		// Is there something in the RX buffer?
 #define TXREADY (UCSRA & _BV(UDRE))		// Is the transmit buffer empty?
 
+#ifndef TRUE
 #define TRUE	1
 #define FALSE	0
+#endif
 
-
-uint8_t EEMEM eeVer[]="PN532 Reader v20131229";
+uint8_t EEMEM eeVer[]="PN532 Reader v20140108";
 
 void errMsg(uint8_t);
 void getCardID(uint8_t *, uint8_t*);
-void init_ATtiny4313(void);
+static inline void init_ATtiny4313(void);
+uint8_t readCard(uint8_t*);
 uint16_t recvNum(void);
 void sendBlock(uint8_t*, uint8_t);
 void sendPrompt(void);
@@ -57,7 +59,7 @@ uint8_t writeMiFare(uint8_t*);
 int main (void)
 {
 
-	uint8_t i, cmd, frameBuf[36], cardID[5];
+	uint8_t i, cmd, frameBuf[36], cardID[5], wheel;
 
 	init_ATtiny4313();
 
@@ -73,11 +75,15 @@ int main (void)
 	sendPrompt();
 
 	for (;;) {
-		if (COMMANDSENT) {
+		if (CHARSENT) {
+
 			cmd = UDR;
 			sendByte(cmd);
+			wheel = -1;
+
 			switch(cmd) {
-				case ('R'):
+
+				case ('R'):					// Software reset
 					wdt_enable(WDTO_60MS);
 					while (1) {};
 					break;
@@ -95,32 +101,11 @@ int main (void)
 						sendNum((int) frameBuf[10], 10);
 						sendByte('.');
 						sendNum((int) frameBuf[11], 10);
-//						for (i = 0; i < 15; i++) {
-//							sendNum((int) frameBuf[i], 16);
-//							sendByte(' ');
-//						}
 					} else {
 						errMsg(2);
 					}
 					break;
-#ifdef MCPDEBUG
-				case ('m'):
-					mcp23008_Write(MCP23008_BASEADDR, GPIO, 128);
-				/*
-					for (i = 0; i < 128; i++) {
-						if (!mcp23008_Write(MCP23008_BASEADDR, GPIO, i)) {
-							errMsg(14);
-							break;
-						}
-						_delay_ms(5);
-					}
-				*/
-					break;
 
-				case ('n'):
-					mcp23008_Write(MCP23008_BASEADDR, GPIO, 0);
-					break;
-#endif
 				case ('i'):
 					getCardID(cardID, frameBuf);
 					break;
@@ -133,14 +118,12 @@ int main (void)
 							cardID[i] = frameBuf[i+15];
 						}
 						sendCRLF();
-						if (pn532_readBlock(cardID, 1, frameBuf)) {;
-							//pn532_writeBlock(cardID, 1, dataBlock, frameBuf);
+						if (pn532_readBlock(cardID, 1, frameBuf)) {
 							sendBlock(frameBuf, 10);
 						} else {
 							errMsg(17);
 						}
-						if (pn532_readBlock(cardID, 2, frameBuf)) {;
-							//pn532_writeBlock(cardID, 1, dataBlock, frameBuf);
+						if (pn532_readBlock(cardID, 2, frameBuf)) {
 							sendBlock(frameBuf, 10);
 						} else {
 							errMsg(17);
@@ -151,8 +134,24 @@ int main (void)
 					brightness(0);
 					break;
 
+				case ('0'):					// Read the first two blocks from the tag under wheel 0
+					// select the wheel here
+					GPIOR0 &= ~_BV(0);
+					if (! readCard(frameBuf)) {
+						errMsg(10);
+					}
+					break;
+
+				case ('1'):
+					// select the wheel here
+					GPIOR0 &= ~_BV(0);
+					if (! readCard(frameBuf)) {
+						errMsg(11);
+					}
+					break;
+
 #ifdef DEBUG
-				case ('s'):
+				case ('s'):					// Scan the TWI bus for devices
 					for (i = 0; i < 255; i++) {
 						frameBuf[0] = i;
 						usi_twi_master_start();
@@ -177,7 +176,7 @@ int main (void)
 					break;
 
 				default:
-					sendByte('?');
+					errMsg(99);
 					break;
 
 			}
@@ -204,6 +203,35 @@ void getCardID(uint8_t cardID[], uint8_t frameBuf[])
 		errMsg(23);
 	}
 
+}
+
+//FOLLOWING NOT TESTED
+
+uint8_t readCard(uint8_t frameBuf[])
+{
+
+	uint8_t i, cardID[5];
+
+	pn532_twi_sendCommand(INLISTPASSIVETARGET, frameBuf, 0);
+
+	if (frameBuf[9]) {
+		for (i = 0; i < 4; i++) {
+			cardID[i] = frameBuf[i+15];
+		}
+		sendCRLF();
+		if (pn532_readBlock(cardID, 1, frameBuf)) {
+			sendBlock(frameBuf, 10);
+		} else {
+			return(FALSE);
+		}
+		if (pn532_readBlock(cardID, 2, frameBuf)) {
+			sendBlock(frameBuf, 10);
+		} else {
+			return(FALSE);
+		}
+		return(TRUE);
+	}
+	return(FALSE);
 }
 
 void sendBlock(uint8_t frameBuf[], uint8_t base)
@@ -243,7 +271,7 @@ uint8_t writeMiFare(uint8_t frameBuf[])
 	}
 
 	for (i=0; i<32; i++) {
-		while (!COMMANDSENT) {
+		while (!CHARSENT) {
 		}
 		buf[i] = UDR;
 		sendByte(buf[i]);
@@ -284,7 +312,7 @@ uint16_t recvNum(void)
 	uint8_t i = 0;
 
 	for (;;) {
-		while (!COMMANDSENT) {
+		while (!CHARSENT) {
 			asm("nop");
 		}
 		strBuf[i] = UDR;
@@ -367,29 +395,7 @@ void sendString(char str[])
 
 /*
 	errMsg()
-	1 - mcp23008_Init() fail
-	2 - GETFIRMWAREVERSION fail
-	3 - PN532 send cmd with ack fail
-	4 - Receive ack fail in send cmd with ack command
-	5 - Receive ack timeout
-	6 - Firmware version mismatch
-	7 - Send cmd ack fail in authenticate block
-	8 - authenticate block reply error
-	9 - Send cmd ack fail in read block
-	10- readblock reply error
-	11- send cmd with ack fail in write block
-	12- bad reply in write block
-	13- Firmware version mismatch
-	14- mcp23008 write error
-	15- SAMCONFIG error
-	16- RFCONFIG error
-	17- card read error
-	18- No card in field
-	19- Error writing block 1
-	20- Error writing block 2
-	22- PN532 IRQ sent (not error)
-	23- get card id error (no card?)
-
+	E99 - bad command
 */
 
 void errMsg(uint8_t msgNum)
@@ -400,7 +406,6 @@ void errMsg(uint8_t msgNum)
 	sendNum(msgNum, 10);
 
 }
-
 
 /*
 ===========================================================================
@@ -586,12 +591,13 @@ void errMsg(uint8_t msgNum)
 #define PUSHBUTTON	3
 #define BROWNOUT	4
 
-void init_ATtiny4313(void)
+static inline void init_ATtiny4313(void)
 {
 
-	char strBuf[25];
+	char strBuf[30];
 	uint8_t junk, resetType = 0;
 
+								// Handle watchdog reset
 	if (MCUSR & _BV(WDRF)) {	// If there was a watchdog reset...
 		MCUSR = 0x00;			// Clear the WDRF flag (and everything else)
 		WDTCR = 0x18;			// WDCE must be high to change WDE (WDEnable)
@@ -608,28 +614,30 @@ void init_ATtiny4313(void)
 
 	UBRRH = (uint8_t) (MYUBRR >> 8);	// Set baud rate
 	UBRRL = (uint8_t) MYUBRR;
-	UCSRB = 0b00011000;			// Enable transmit & receive
-	UCSRC = 0b00000110;			// 8 data bits, no parity, one stop bit
+	UCSRB = 0b00011000;					// Enable transmit & receive
+	UCSRC = 0b00000110;					// 8 data bits, no parity, one stop bit
 
-	TCCR0A = 0b10000001;		// Phase-correct PWM on OC0A (see above)
-	TCCR0B = 0b00000010;		// Select clock prescaler /8 (see above)
+										// PWM output for LED (don't need this)
+	TCCR0A = 0b10000001;				// Phase-correct PWM on OC0A (see above)
+	TCCR0B = 0b00000010;				// Select clock prescaler /8 (see above)
 
-	DDRB  |= _BV(LEDPIN);		// LEDPIN is an output
-	PORTD |= _BV(INTPIN);		// Pullup
+	DDRB  |= _BV(LEDPIN);				// LEDPIN is an output
 
-	while (COMMANDSENT) {		// Clear the serial port
+	PORTD |= _BV(INTPIN);				// Pullup on interrupt pin
+
+	while (CHARSENT) {					// Clear the serial port
 		junk = UDR;
 	}
 
 	switch (resetType) {
 		case (WATCHDOG):
-			sendString("S");
+			sendString("WD");
 			break;
 		case (BROWNOUT):
 			sendString("BO");
 			break;
 		case (POWERON):
-			sendString("UP");
+			sendString("PU");
 			break;
 		case (PUSHBUTTON):
 			sendString("PB");
@@ -638,12 +646,11 @@ void init_ATtiny4313(void)
 			break;
 		}
 
-	eeprom_read_block((void*) &strBuf, (const void*) &eeVer, 23);
-//	strBuf[22] = 0x00;
+	eeprom_read_block((void*) &strBuf, (const void*) &eeVer, 30);
 	sendCRLF();
 	sendString(strBuf);
 
-	brightness(255);
+	brightness(255);			// Flash the light (alive indication)
 	_delay_ms(100);
 	brightness(0);
 
