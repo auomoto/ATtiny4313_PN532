@@ -1,9 +1,6 @@
 #include "usi_twi_master.h"
 #include "pn532_twi.h"
 
-void printFrameBuf(uint8_t);
-void errMsg(uint8_t);
-
 uint8_t pn532_authenticateBlock(uint8_t cardID[], uint8_t blockNum, uint8_t frameBuf[])
 
 {
@@ -21,7 +18,6 @@ uint8_t pn532_authenticateBlock(uint8_t cardID[], uint8_t blockNum, uint8_t fram
 	}
 	len = pn532_buildFrame(15, command, frameBuf);
 	if (pn532_twi_sendCmdAck(frameBuf, len) == FALSE) {
-		errMsg(7);
 		return(FALSE);
 	}
 	while (pn532_notReady()) {
@@ -31,7 +27,6 @@ uint8_t pn532_authenticateBlock(uint8_t cardID[], uint8_t blockNum, uint8_t fram
 	usi_twi_master_receive(frameBuf, 14);
 	usi_twi_master_stop();
 	if (frameBuf[9]) {
-		errMsg(8);
 		return(FALSE);
 	}
 
@@ -53,7 +48,6 @@ uint8_t pn532_readBlock(uint8_t cardID[], uint8_t blockNum, uint8_t frameBuf[])
 	command[3] = blockNum;
 	len = pn532_buildFrame(5, command, frameBuf);
 	if (pn532_twi_sendCmdAck(frameBuf, len) == FALSE) {
-		errMsg(9);
 		return(FALSE);
 	}
 	while (pn532_notReady()) {
@@ -63,16 +57,11 @@ uint8_t pn532_readBlock(uint8_t cardID[], uint8_t blockNum, uint8_t frameBuf[])
 	usi_twi_master_receive(frameBuf, 26);
 	usi_twi_master_stop();
 	if (frameBuf[9] != 0x00) {
-		errMsg(10);
 		return(FALSE);
 	} else {
-//		printFrameBuf(26);
 		return(TRUE);
 	}
 }
-	
-
-
 
 uint8_t pn532_writeBlock(uint8_t cardID[], uint8_t blockNum, uint8_t data[], uint8_t frameBuf[])
 {
@@ -91,7 +80,6 @@ uint8_t pn532_writeBlock(uint8_t cardID[], uint8_t blockNum, uint8_t data[], uin
 	}
 	len = pn532_buildFrame(21, command, frameBuf);
 	if (pn532_twi_sendCmdAck(frameBuf, len) == FALSE) {
-		errMsg(11);
 		return(FALSE);
 	}
 
@@ -102,23 +90,18 @@ uint8_t pn532_writeBlock(uint8_t cardID[], uint8_t blockNum, uint8_t data[], uin
 	usi_twi_master_receive(frameBuf, 29);
 	usi_twi_master_stop();
 	if (frameBuf[9] != 0x00) {
-		errMsg(12);
 		return(FALSE);
 	} else {
-//		printFrameBuf(29);
 		return(TRUE);
 	}
 
 }
 
-
-
-
 /*
 
 	Build a pn532 command frame. Does not read or write to the TWI bus.
 
-	len is the command length, the sum of tfi byte + command byte + data.
+	len is the command length, the count of tfi byte + command byte + data.
 
 	command[] contains the command (zeroth byte) and following data.
 
@@ -169,9 +152,6 @@ uint8_t pn532_buildFrame(uint8_t len, uint8_t command[], uint8_t framebuf[])
 
 */
 
-void sendCRLF(void);
-void sendNum(uint16_t, uint8_t);
-void sendByte(uint8_t);
 uint8_t pn532_twi_sendCommand(uint8_t cmd, uint8_t frameBuf[], uint8_t blockNum)
 {
 
@@ -196,7 +176,6 @@ uint8_t pn532_twi_sendCommand(uint8_t cmd, uint8_t frameBuf[], uint8_t blockNum)
 
 			for (i = 0; i < 15; i++) {
 				if (firmwareVersion[i] != frameBuf[i]) {
-					errMsg(13);
 					return(FALSE);
 				}
 
@@ -270,13 +249,11 @@ uint8_t pn532_twi_sendCmdAck(uint8_t frameBuf[], uint8_t frameLen)
 
 	if (usi_twi_master_transmit(frameBuf, frameLen) == FALSE) {
 		usi_twi_master_stop();
-		errMsg(3);
 		return(FALSE);
 	}
 	usi_twi_master_stop();
 
 	if (pn532_recvAck(frameBuf) == FALSE) {
-		errMsg(4);
 		return(FALSE);
 	}
 
@@ -285,7 +262,7 @@ uint8_t pn532_twi_sendCmdAck(uint8_t frameBuf[], uint8_t frameLen)
 
 /*
 
-	Reads and verifies the PN532 acknowledge frame.
+	Receives and verifies the PN532 acknowledge frame.
 
 */
 uint8_t pn532_recvAck(uint8_t frameBuf[])
@@ -299,7 +276,6 @@ uint8_t pn532_recvAck(uint8_t frameBuf[])
 		i++;
 		_delay_us(100);
 		if (i > 127) {
-			errMsg(5);
 			return(FALSE);
 		}
 	}
@@ -318,15 +294,17 @@ uint8_t pn532_recvAck(uint8_t frameBuf[])
 
 }
 
+/*
+	Check the interruput pin to see if
+	the PN532 is ready to send data.
+*/
 uint8_t pn532_notReady()
 {
 
 	if ((PIND & _BV(INTPIN))) {
-//		errMsg(22);
 		return(TRUE);
 	} else {
 		return(FALSE);
 	}
 
 }
-
