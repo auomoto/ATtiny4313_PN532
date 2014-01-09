@@ -12,6 +12,15 @@
 
 #define INTPIN				PD2
 
+// GPIOR0 bit positions for error flags
+#define RECVACK				0x01
+#define FWVER				0x02
+#define AUTHBLK				0x03
+#define READBLK				0x04
+#define WRITEBLK			0x05
+#define SENDCMDACK			0x06
+#define INITPN532			0x07
+
 uint8_t pn532_twi_sendCommand(uint8_t, uint8_t*, uint8_t);
 uint8_t pn532_buildFrame(uint8_t, uint8_t*, uint8_t*);
 void pn532_twi_recvACK(uint8_t*);
