@@ -18,6 +18,7 @@ uint8_t pn532_authenticateBlock(uint8_t cardID[], uint8_t blockNum, uint8_t fram
 	}
 	len = pn532_buildFrame(15, command, frameBuf);
 	if (pn532_twi_sendCmdAck(frameBuf, len) == FALSE) {
+		GPIOR0 |= _BV(AUTHBLK);
 		return(FALSE);
 	}
 	while (pn532_notReady()) {
@@ -27,9 +28,10 @@ uint8_t pn532_authenticateBlock(uint8_t cardID[], uint8_t blockNum, uint8_t fram
 	usi_twi_master_receive(frameBuf, 14);
 	usi_twi_master_stop();
 	if (frameBuf[9]) {
+		GPIOR0 |= _BV(AUTHBLK);
 		return(FALSE);
 	}
-
+	GPIOR0 &= ~_BV(AUTHBLK);
 	return(TRUE);
 
 }
@@ -48,6 +50,7 @@ uint8_t pn532_readBlock(uint8_t cardID[], uint8_t blockNum, uint8_t frameBuf[])
 	command[3] = blockNum;
 	len = pn532_buildFrame(5, command, frameBuf);
 	if (pn532_twi_sendCmdAck(frameBuf, len) == FALSE) {
+		GPIOR0 |= _BV(READBLK);
 		return(FALSE);
 	}
 	while (pn532_notReady()) {
@@ -57,8 +60,10 @@ uint8_t pn532_readBlock(uint8_t cardID[], uint8_t blockNum, uint8_t frameBuf[])
 	usi_twi_master_receive(frameBuf, 26);
 	usi_twi_master_stop();
 	if (frameBuf[9] != 0x00) {
+		GPIOR0 |= _BV(READBLK);
 		return(FALSE);
 	} else {
+		GPIOR0 &= ~_BV(READBLK);
 		return(TRUE);
 	}
 }
@@ -69,6 +74,7 @@ uint8_t pn532_writeBlock(uint8_t cardID[], uint8_t blockNum, uint8_t data[], uin
 	uint8_t i, len, command[25];
 
 	if (pn532_authenticateBlock(cardID, blockNum, frameBuf) == FALSE) {
+		GPIOR0 |= _BV(WRITEBLK);
 		return(FALSE);
 	}
 	command[0] = INDATAEXCHANGE;
@@ -80,6 +86,7 @@ uint8_t pn532_writeBlock(uint8_t cardID[], uint8_t blockNum, uint8_t data[], uin
 	}
 	len = pn532_buildFrame(21, command, frameBuf);
 	if (pn532_twi_sendCmdAck(frameBuf, len) == FALSE) {
+		GPIOR0 |= _BV(WRITEBLK);
 		return(FALSE);
 	}
 
@@ -90,8 +97,10 @@ uint8_t pn532_writeBlock(uint8_t cardID[], uint8_t blockNum, uint8_t data[], uin
 	usi_twi_master_receive(frameBuf, 29);
 	usi_twi_master_stop();
 	if (frameBuf[9] != 0x00) {
+		GPIOR0 |= _BV(WRITEBLK);
 		return(FALSE);
 	} else {
+		GPIOR0 &= ~_BV(WRITEBLK);
 		return(TRUE);
 	}
 
@@ -123,7 +132,7 @@ uint8_t pn532_buildFrame(uint8_t len, uint8_t command[], uint8_t framebuf[])
 	framebuf[2] = 0x00;						// start of frame
 	framebuf[3] = 0xff;						// start of frame
 	framebuf[4] = len;						// commmand length
-	framebuf[5] = ~len + 1;				// lcs (packet length checksum)
+	framebuf[5] = ~len + 1;					// lcs (packet length checksum)
 	framebuf[6] = 0xd4;						// tfi (frame identifier)
 	temp = 0xd4;							// build the data checksum
 	j = 7;
@@ -221,7 +230,7 @@ uint8_t pn532_twi_sendCommand(uint8_t cmd, uint8_t frameBuf[], uint8_t blockNum)
 			command[1] = 0x05;
 			command[2] = 0xFF;
 			command[3] = 0x01;
-			command[4] = 0x01;	// MxRtyPassiveActivation
+			command[4] = 0x01;		// MxRtyPassiveActivation
 			frameLen = pn532_buildFrame(6, command, frameBuf);
 			if (pn532_twi_sendCmdAck(frameBuf, frameLen) == FALSE) {
 				return(FALSE);
@@ -249,14 +258,17 @@ uint8_t pn532_twi_sendCmdAck(uint8_t frameBuf[], uint8_t frameLen)
 
 	if (usi_twi_master_transmit(frameBuf, frameLen) == FALSE) {
 		usi_twi_master_stop();
+		GPIOR0 |= _BV(SENDCMDACK);
 		return(FALSE);
 	}
 	usi_twi_master_stop();
 
 	if (pn532_recvAck(frameBuf) == FALSE) {
+		GPIOR0 |= _BV(SENDCMDACK);
 		return(FALSE);
 	}
 
+	GPIOR0 &= ~_BV(SENDCMDACK);
 	return(TRUE);
 }
 
@@ -276,6 +288,7 @@ uint8_t pn532_recvAck(uint8_t frameBuf[])
 		i++;
 		_delay_us(100);
 		if (i > 127) {
+			GPIOR0 |= _BV(RECVACK);
 			return(FALSE);
 		}
 	}
@@ -287,9 +300,12 @@ uint8_t pn532_recvAck(uint8_t frameBuf[])
 
 	for (i = 0; i < 8; i++) {
 		if (frameBuf[i] != ackFrame[i]) {
+			GPIOR0 |= _BV(RECVACK);
 			return(FALSE);
 		}
 	}
+
+	GPIOR0 &= ~_BV(RECVACK);
 	return (TRUE);
 
 }
