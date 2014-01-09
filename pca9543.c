@@ -1,9 +1,11 @@
 #include "pca9543.h"
 #include "usi_twi_master.h"
 
-void pca9543SelectChannel(uint8_t channel);
-uint8_t pca9543InterruptChannel(void);
-
+/*
+	Selects the channel (0 or 1) that the PCA9543
+	I2C bus switch will connect. The PCA9543 will
+	allow both channels but we won't permit that.
+*/
 void pca9543SelectChannel(uint8_t channel)
 {
 
@@ -11,10 +13,16 @@ void pca9543SelectChannel(uint8_t channel)
 
 	cmdArray[0] = (PCA9543_BASEADDR << 1);
 	cmdArray[1] = (1 << channel);
-
+/*
 	usi_twi_master_start();
 	usi_twi_master_transmit(cmdArray, 2);
 	usi_twi_master_stop();
+*/
+	if (channel == 1) {
+		GPIOR0 |= 0x01;
+	} else {
+		GPIOR0 &= 0xFE;
+	}
 
 }
 
