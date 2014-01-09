@@ -41,11 +41,12 @@
 #define FALSE	0
 #endif
 
-uint8_t EEMEM eeVer[]="PN532 Reader v20140108";
+uint8_t EEMEM eeVer[]="Filter_Reader 20140109";		// be careful of the count
 
 void errMsg(uint8_t);
-void getCardID(uint8_t *, uint8_t*);
+uint8_t getCardID(uint8_t *, uint8_t*);
 static inline void init_ATtiny4313(void);
+static inline void init_pn532(uint8_t*);
 uint8_t readCard(uint8_t*);
 uint16_t recvNum(void);
 void sendBlock(uint8_t*, uint8_t);
@@ -59,18 +60,12 @@ uint8_t writeMiFare(uint8_t*);
 int main (void)
 {
 
-	uint8_t i, cmd, frameBuf[36], cardID[5], wheel;
+	uint8_t cmd, frameBuf[36], cardID[5];
+	char strBuf[32];
 
 	init_ATtiny4313();
-
 	usi_twi_master_initialize();
-
-	if (!pn532_twi_sendCommand(SAMCONFIG, frameBuf, 0)) {		// move to an init routine
-		errMsg(15);
-	}
-	if (!	pn532_twi_sendCommand(RFCONFIGURATION, frameBuf, 0)) {
-		errMsg(16);
-	}
+	init_pn532(frameBuf);
 
 	sendPrompt();
 
@@ -79,7 +74,6 @@ int main (void)
 
 			cmd = UDR;
 			sendByte(cmd);
-			wheel = -1;
 
 			switch(cmd) {
 
@@ -96,62 +90,31 @@ int main (void)
 					brightness(0);
 					break;
 
-				case ('v'):
-					if (pn532_twi_sendCommand(GETFIRMWAREVERSION, frameBuf, 0)) {
-						sendNum((int) frameBuf[10], 10);
-						sendByte('.');
-						sendNum((int) frameBuf[11], 10);
-					} else {
-						errMsg(2);
-					}
-					break;
-
 				case ('i'):
-					getCardID(cardID, frameBuf);
-					break;
-
-				case ('r'):					// Read the first two blocks from the MiFare card (change to a subroutine)
-					brightness(200);
-					pn532_twi_sendCommand(INLISTPASSIVETARGET, frameBuf, 0);
-					if (frameBuf[9]) {
-						for (i = 0; i < 4; i++) {
-							cardID[i] = frameBuf[i+15];
-						}
-						sendCRLF();
-						if (pn532_readBlock(cardID, 1, frameBuf)) {
-							sendBlock(frameBuf, 10);
-						} else {
-							errMsg(17);
-						}
-						if (pn532_readBlock(cardID, 2, frameBuf)) {
-							sendBlock(frameBuf, 10);
-						} else {
-							errMsg(17);
-						}
-					} else {
-						errMsg(18);
+					// select wheel routine here
+					if (! getCardID(cardID, frameBuf)) {
+						errMsg(10 + (GPIOR0 &= 0x01));
 					}
-					brightness(0);
 					break;
-
-				case ('0'):					// Read the first two blocks from the tag under wheel 0
-					// select the wheel here
-					GPIOR0 &= ~_BV(0);
+					
+				case ('r'):					// Read the first two blocks from the tag under wheel 0
 					if (! readCard(frameBuf)) {
-						errMsg(10);
+						errMsg(10 + (GPIOR0 &= 0x01));
 					}
+					break;
+
+				case ('0'):
+					// select the wheel here
+					pca9543SelectChannel(0);
 					break;
 
 				case ('1'):
 					// select the wheel here
-					GPIOR0 &= ~_BV(0);
-					if (! readCard(frameBuf)) {
-						errMsg(11);
-					}
+					pca9543SelectChannel(1);
 					break;
 
 #ifdef DEBUG
-				case ('s'):					// Scan the TWI bus for devices
+				case ('S'):					// Scan the TWI bus for devices
 					for (i = 0; i < 255; i++) {
 						frameBuf[0] = i;
 						usi_twi_master_start();
@@ -164,15 +127,35 @@ int main (void)
 					}
 					break;
 #endif
+				case ('s'):					// Status
+					sendCRLF();
+					eeprom_read_block((void*) &strBuf, (const void*) &eeVer, 32);
+					sendString(strBuf);
+					if (pn532_twi_sendCommand(GETFIRMWAREVERSION, frameBuf, 0)) {
+						sendByte(' ');
+						sendNum((int) frameBuf[10], 10);
+						sendByte('.');
+						sendNum((int) frameBuf[11], 10);
+					}
+					sendString(" 0x");
+					sendNum(GPIOR0, 16);
+					break;
+
+				case ('\r'):
+					break;
+
+#ifdef DEBUG
 				case ('t'):					// a test function
 					sendCRLF();
 					sendString(":");
 					int itest = recvNum();
 					sendNum(itest, 10);
 					break;
-
+#endif
 				case ('w'):			// Write the first two blocks in the MiFare card
-					writeMiFare(frameBuf);
+					if (! writeMiFare(frameBuf)) {
+						errMsg(20 + (GPIOR0 & 0x01));
+					}
 					break;
 
 				default:
@@ -185,7 +168,7 @@ int main (void)
 	}
 }
 
-void getCardID(uint8_t cardID[], uint8_t frameBuf[])
+uint8_t getCardID(uint8_t cardID[], uint8_t frameBuf[])
 {
 
 	uint8_t i;
@@ -200,12 +183,10 @@ void getCardID(uint8_t cardID[], uint8_t frameBuf[])
 			sendNum(cardID[i], 16);
 		}
 	} else {
-		errMsg(23);
+		return(FALSE);
 	}
-
+	return(TRUE);
 }
-
-//FOLLOWING NOT TESTED
 
 uint8_t readCard(uint8_t frameBuf[])
 {
@@ -218,8 +199,8 @@ uint8_t readCard(uint8_t frameBuf[])
 		for (i = 0; i < 4; i++) {
 			cardID[i] = frameBuf[i+15];
 		}
-		sendCRLF();
 		if (pn532_readBlock(cardID, 1, frameBuf)) {
+			sendCRLF();
 			sendBlock(frameBuf, 10);
 		} else {
 			return(FALSE);
@@ -257,8 +238,22 @@ uint8_t writeMiFare(uint8_t frameBuf[])
 	uint8_t cardID[5], buf[32];
 	uint8_t i;
 
+	for (i=0; i<32; i++) {
+		buf[i] = ' ';
+	}
+	for (i=0; i<32; i++) {
+		while (!CHARSENT) {
+		}
+		buf[i] = UDR;
+		if (buf[i] < 0x20) {	// 0x20 is a space
+			buf[i] = ' ';
+			break;
+		} else {
+			sendByte(buf[i]);
+		}
+	}
+
 	if (! pn532_twi_sendCommand(INLISTPASSIVETARGET, frameBuf, 0)) {
-		errMsg(21);
 		return(FALSE);
 	}
 	if (frameBuf[9]) {
@@ -266,29 +261,14 @@ uint8_t writeMiFare(uint8_t frameBuf[])
 			cardID[i] = frameBuf[i+15];
 		}
 	} else {
-		errMsg(23);
 		return(FALSE);
 	}
 
-	for (i=0; i<32; i++) {
-		while (!CHARSENT) {
-		}
-		buf[i] = UDR;
-		sendByte(buf[i]);
-		if (buf[i] == '\r') {
-			sendByte('\n');
-			break;
-		}
-	}
-	for (; i<32; i++) {
-		buf[i] = ' ';
-	}
+
 	if (! pn532_writeBlock(cardID, 1, buf, frameBuf)) {
-		errMsg(19);
 		return(FALSE);
 	}
 	if (! pn532_writeBlock(cardID, 2, &buf[16], frameBuf)) {
-		errMsg(20);
 		return(FALSE);
 	}
 	return(TRUE);
@@ -404,6 +384,28 @@ void errMsg(uint8_t msgNum)
 	sendCRLF();
 	sendByte('E');
 	sendNum(msgNum, 10);
+
+}
+
+static inline void init_pn532(uint8_t frameBuf[])
+{
+
+	uint8_t i;
+	
+	for (i = 0; i < 2; i++) {
+		pca9543SelectChannel(i);	
+		if (! pn532_twi_sendCommand(SAMCONFIG, frameBuf, 0)) {
+			GPIOR0 |= _BV(INITPN532);
+			errMsg(80 + (GPIOR0 & 0x01));
+			return;
+		}
+		if (! pn532_twi_sendCommand(RFCONFIGURATION, frameBuf, 0)) {
+			GPIOR0 |= _BV(INITPN532);
+			errMsg(80 + (GPIOR0 & 0x01));
+			return;
+		}
+	}
+	pca9543SelectChannel(0);
 
 }
 
@@ -594,7 +596,6 @@ void errMsg(uint8_t msgNum)
 static inline void init_ATtiny4313(void)
 {
 
-	char strBuf[30];
 	uint8_t junk, resetType = 0;
 
 								// Handle watchdog reset
@@ -645,10 +646,6 @@ static inline void init_ATtiny4313(void)
 		default:
 			break;
 		}
-
-	eeprom_read_block((void*) &strBuf, (const void*) &eeVer, 30);
-	sendCRLF();
-	sendString(strBuf);
 
 	brightness(255);			// Flash the light (alive indication)
 	_delay_ms(100);
