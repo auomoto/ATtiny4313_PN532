@@ -79,7 +79,7 @@ OBJDIR = .
 
 
 # List C source files here. (C dependencies are automatically generated.)
-SRC = $(TARGET).c usi_twi_master.c mcp23008.c pn532_twi.c
+SRC = $(TARGET).c usi_twi_master.c mcp23008.c pn532_twi.c pca9543.c
 
 
 # List C++ source files here. (C dependencies are automatically generated.)
