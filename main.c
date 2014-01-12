@@ -22,6 +22,7 @@
 
 //#define PN532DEBUG
 #include <stdlib.h>						// for atoi()
+#include <string.h>						// for memset()
 #include <util/delay.h>					// AVR/GCC delay routines
 #include <avr/io.h>
 #include <avr/wdt.h>
@@ -71,7 +72,9 @@ int main (void)
 
 	for (;;) {
 		if (CHARSENT) {
-
+brightness(255);
+_delay_ms(25);
+brightness(0);
 			cmd = UDR;
 			sendByte(cmd);
 
@@ -91,7 +94,6 @@ int main (void)
 					break;
 
 				case ('i'):
-					// select wheel routine here
 					if (! getCardID(cardID, frameBuf)) {
 						errMsg(10 + (GPIOR0 &= 0x01));
 					}
@@ -104,12 +106,10 @@ int main (void)
 					break;
 
 				case ('0'):
-					// select the wheel here
 					pca9543SelectChannel(0);
 					break;
 
 				case ('1'):
-					// select the wheel here
 					pca9543SelectChannel(1);
 					break;
 
@@ -238,9 +238,7 @@ uint8_t writeMiFare(uint8_t frameBuf[])
 	uint8_t cardID[5], buf[32];
 	uint8_t i;
 
-	for (i=0; i<32; i++) {
-		buf[i] = ' ';
-	}
+	memset(buf, 0x20, 32);
 	for (i=0; i<32; i++) {
 		while (!CHARSENT) {
 		}
@@ -586,7 +584,7 @@ static inline void init_pn532(uint8_t frameBuf[])
 
 */
 
-#define BAUDRATE 19200
+#define BAUDRATE 9600
 #define MYUBRR ((F_CPU / 16 / BAUDRATE) -1)
 #define WATCHDOG	1
 #define POWERON		2
