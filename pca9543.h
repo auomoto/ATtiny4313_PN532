@@ -8,6 +8,6 @@
 #include <stdint.h>
 #define PCA9543_BASEADDR 0x70		// A0 and A1 grounded. Shift left one and add r/w bit.
 
-void pca9543SelectChannel(uint8_t channel);
-
+void pca9543SelectChannel(uint8_t);
 uint8_t pca9543InterruptChannel(void);
+uint8_t pca9543ControlRegister(void);

@@ -1,3 +1,4 @@
+#include <string.h>				// memset()
 #include "pca9543.h"
 #include "usi_twi_master.h"
 
@@ -13,11 +14,11 @@ void pca9543SelectChannel(uint8_t channel)
 
 	cmdArray[0] = (PCA9543_BASEADDR << 1);
 	cmdArray[1] = (1 << channel);
-/*
+
 	usi_twi_master_start();
 	usi_twi_master_transmit(cmdArray, 2);
 	usi_twi_master_stop();
-*/
+
 	if (channel == 1) {
 		GPIOR0 |= 0x01;
 	} else {
@@ -36,14 +37,11 @@ void pca9543SelectChannel(uint8_t channel)
 uint8_t pca9543InterruptChannel()
 {
 
-	uint8_t cmdArray[2];
+	uint8_t reg;
 
-	cmdArray[0] = ((PCA9543_BASEADDR << 1) | 0x01);
-	usi_twi_master_start();
-	usi_twi_master_receive(cmdArray, 2);
-	usi_twi_master_stop();
+	reg = pca9543ControlRegister();
 
-	switch (cmdArray[1] & 0x30) {
+	switch (reg & 0x30) {
 
 		case (0x10):
 			return(0);
@@ -61,5 +59,23 @@ uint8_t pca9543InterruptChannel()
 			return(3);
 
 	}
+
+}
+
+/*
+	Returns the pca9543 control register
+*/
+
+uint8_t pca9543ControlRegister()
+{
+
+	uint8_t cmdArray[2];
+
+	cmdArray[0] = ((PCA9543_BASEADDR << 1) | 0x01);
+	usi_twi_master_start();
+	usi_twi_master_receive(cmdArray, 2);
+	usi_twi_master_stop();
+
+	return(cmdArray[1]);
 
 }
