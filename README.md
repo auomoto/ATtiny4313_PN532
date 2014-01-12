@@ -7,7 +7,7 @@ The target operation is automated filter identification in a telescope filter wh
 The code is written for avr-gcc.
 
 To-do:
-- [ ] Add second controller
-- [ ] Add I2C bus switch
-- [ ] Add RS-422 transceiver and tie the handshaking lines
+- Add second controller
+- Add I2C bus switch
+- Add RS-422 transceiver and tie the handshaking lines
 
