@@ -31,6 +31,7 @@
 #include "pca9543.h"
 #include "PN532_twi.h"
 
+#define RESETPIN PB0					// Connect to reset pin on PN532 board
 #define LEDPIN PB2						// PB2 is the pin for OC0A
 #define brightness(X) (OCR0A = X)		// PWM on PB2
 
@@ -42,7 +43,7 @@
 #define FALSE	0
 #endif
 
-uint8_t EEMEM eeVer[]="Filter_Reader 20140109";		// be careful of the count
+uint8_t EEMEM eeVer[]="Filter_Reader 20140112";		// be careful of the count
 
 void errMsg(uint8_t);
 uint8_t getCardID(uint8_t *, uint8_t*);
@@ -129,13 +130,16 @@ brightness(0);
 #endif
 				case ('s'):					// Status
 					sendCRLF();
-					eeprom_read_block((void*) &strBuf, (const void*) &eeVer, 32);
+					eeprom_read_block((void*) &strBuf, (const void*) &eeVer, 22);
+					strBuf[22] = 0x00;
 					sendString(strBuf);
 					if (pn532_twi_sendCommand(GETFIRMWAREVERSION, frameBuf, 0)) {
 						sendByte(' ');
 						sendNum((int) frameBuf[10], 10);
 						sendByte('.');
 						sendNum((int) frameBuf[11], 10);
+					} else {
+						sendString(" X.X");
 					}
 					sendString(" 0x");
 					sendNum(GPIOR0, 16);
@@ -389,9 +393,9 @@ static inline void init_pn532(uint8_t frameBuf[])
 {
 
 	uint8_t i;
-	
+
 	for (i = 0; i < 2; i++) {
-		pca9543SelectChannel(i);	
+		pca9543SelectChannel(i);
 		if (! pn532_twi_sendCommand(SAMCONFIG, frameBuf, 0)) {
 			GPIOR0 |= _BV(INITPN532);
 			errMsg(80 + (GPIOR0 & 0x01));
@@ -584,7 +588,7 @@ static inline void init_pn532(uint8_t frameBuf[])
 
 */
 
-#define BAUDRATE 9600
+#define BAUDRATE 19200
 #define MYUBRR ((F_CPU / 16 / BAUDRATE) -1)
 #define WATCHDOG	1
 #define POWERON		2
@@ -620,13 +624,23 @@ static inline void init_ATtiny4313(void)
 	TCCR0A = 0b10000001;				// Phase-correct PWM on OC0A (see above)
 	TCCR0B = 0b00000010;				// Select clock prescaler /8 (see above)
 
-	DDRB  |= _BV(LEDPIN);				// LEDPIN is an output
-
-	PORTD |= _BV(INTPIN);				// Pullup on interrupt pin
 
 	while (CHARSENT) {					// Clear the serial port
 		junk = UDR;
 	}
+
+	PORTB |= _BV(RESETPIN);
+	DDRB |= _BV(RESETPIN);
+	DDRB |= _BV(LEDPIN);				// LEDPIN is an output
+	PORTD |= _BV(INTPIN);				// Pullup on interrupt pin
+	PORTB &= ~_BV(RESETPIN);			// Reset everything
+	_delay_us(1);
+	PORTB |= _BV(RESETPIN);
+	brightness(255);					// Flash the light (alive indication & reset wait)
+	_delay_ms(100);
+	brightness(0);
+	DDRB &= ~_BV(RESETPIN);			// Tri-state
+	PORTB &= ~_BV(RESETPIN);
 
 	switch (resetType) {
 		case (WATCHDOG):
@@ -643,10 +657,6 @@ static inline void init_ATtiny4313(void)
 			break;
 		default:
 			break;
-		}
-
-	brightness(255);			// Flash the light (alive indication)
-	_delay_ms(100);
-	brightness(0);
+	}
 
 }
