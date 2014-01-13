@@ -1,5 +1,6 @@
 #include "usi_twi_master.h"
 #include "pn532_twi.h"
+#include "pca9543.h"
 
 uint8_t pn532_authenticateBlock(uint8_t cardID[], uint8_t blockNum, uint8_t frameBuf[])
 
@@ -311,16 +312,20 @@ uint8_t pn532_recvAck(uint8_t frameBuf[])
 }
 
 /*
-	Check the interruput pin to see if
-	the PN532 is ready to send data.
+	Check the interruput pin to see if the PN532 is ready to send data.
+	The logic is backwards here; don't get confused.
 */
 uint8_t pn532_notReady()
 {
 
-	if ((PIND & _BV(INTPIN))) {
+	if ((PIND & _BV(INTPIN))) {			// No interrupt from the card
 		return(TRUE);
-	} else {
-		return(FALSE);
 	}
+
+	if (pca9543InterruptChannel() != (GPIOR0 & 0x01)) {	// Wrong card
+		return (TRUE);
+	}
+
+	return(FALSE);
 
 }
