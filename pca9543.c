@@ -41,17 +41,17 @@ uint8_t pca9543InterruptChannel()
 
 	reg = pca9543ControlRegister();
 
-	switch (reg & 0x30) {
+	switch (reg & 0b00110000) {
 
-		case (0x10):
+		case (0b00010000):
 			return(0);
 			break;
 
-		case (0x20):
+		case (0b00100000):
 			return(1);
 			break;
 
-		case (0x30):
+		case (0b00110000):
 			return(2);
 			break;
 
@@ -59,7 +59,6 @@ uint8_t pca9543InterruptChannel()
 			return(3);
 
 	}
-
 }
 
 /*
