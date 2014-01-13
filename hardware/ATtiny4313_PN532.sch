@@ -6,7 +6,7 @@
 <setting alwaysvectorfont="no"/>
 <setting verticaltext="up"/>
 </settings>
-<grid distance="0.1" unitdist="inch" unit="inch" style="lines" multiple="1" display="yes" altdistance="0.01" altunitdist="inch" altunit="inch"/>
+<grid distance="0.1" unitdist="inch" unit="inch" style="lines" multiple="1" display="no" altdistance="0.01" altunitdist="inch" altunit="inch"/>
 <layers>
 <layer number="1" name="Top" color="4" fill="1" visible="no" active="no"/>
 <layer number="16" name="Bottom" color="1" fill="1" visible="no" active="no"/>
@@ -9588,12 +9588,12 @@ at 30/07/2012 10:08:22</description>
 <text x="139.7" y="96.52" size="1.4224" layer="91" rot="R270">SCL</text>
 <text x="137.16" y="96.52" size="1.4224" layer="91" rot="R270">INT</text>
 <text x="134.62" y="96.52" size="1.4224" layer="91" rot="R270">RESET</text>
-<text x="180.34" y="96.52" size="1.4224" layer="91" rot="R270">SDA</text>
-<text x="177.8" y="96.52" size="1.4224" layer="91" rot="R270">VDD</text>
-<text x="175.26" y="96.52" size="1.4224" layer="91" rot="R270">VSS</text>
-<text x="172.72" y="96.52" size="1.4224" layer="91" rot="R270">SCL</text>
-<text x="170.18" y="96.52" size="1.4224" layer="91" rot="R270">INT</text>
-<text x="167.64" y="96.52" size="1.4224" layer="91" rot="R270">RESET</text>
+<text x="182.88" y="96.52" size="1.4224" layer="91" rot="R270">SDA</text>
+<text x="180.34" y="96.52" size="1.4224" layer="91" rot="R270">VDD</text>
+<text x="177.8" y="96.52" size="1.4224" layer="91" rot="R270">VSS</text>
+<text x="175.26" y="96.52" size="1.4224" layer="91" rot="R270">SCL</text>
+<text x="172.72" y="96.52" size="1.4224" layer="91" rot="R270">INT</text>
+<text x="170.18" y="96.52" size="1.4224" layer="91" rot="R270">RESET</text>
 </plain>
 <instances>
 <instance part="IC1" gate="G$1" x="86.36" y="124.46"/>
@@ -9993,14 +9993,14 @@ at 30/07/2012 10:08:22</description>
 <junction x="134.62" y="127"/>
 <pinref part="JP2" gate="A" pin="6"/>
 <pinref part="JP4" gate="A" pin="6"/>
-</segment>
-</net>
-<net name="N$15" class="0">
-<segment>
 <pinref part="U1" gate="A" pin="~RESET"/>
-<wire x1="195.58" y1="157.48" x2="195.58" y2="121.92" width="0.1524" layer="91"/>
+<wire x1="195.58" y1="157.48" x2="195.58" y2="127" width="0.1524" layer="91"/>
+<wire x1="195.58" y1="127" x2="195.58" y2="121.92" width="0.1524" layer="91"/>
 <wire x1="195.58" y1="121.92" x2="205.74" y2="121.92" width="0.1524" layer="91"/>
 <pinref part="R5" gate="G$1" pin="1"/>
+<wire x1="170.18" y1="127" x2="195.58" y2="127" width="0.1524" layer="91"/>
+<junction x="170.18" y="127"/>
+<junction x="195.58" y="127"/>
 </segment>
 </net>
 <net name="N$8" class="0">
