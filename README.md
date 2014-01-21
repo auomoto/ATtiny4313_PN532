@@ -10,6 +10,6 @@ Added ADM1490 (2X) to the schematic for the RS422 serial signal
 To-do:
 - Add second controller
 - Add RS-422 transceiver and tie the handshaking lines
-- Purchase magnetic sheet for shielding
-- Build board holder
+[x] Purchase magnetic sheet for shielding
+[x] Build board holder
 - Build SMD board
