@@ -8,8 +8,8 @@ Ordered three more PN532 shields from Adafruit, 2014-01-16/au
 Added ADM1490 (2X) to the schematic for the RS422 serial signal
 
 To-do:
-- Add second controller
-- Add RS-422 transceiver and tie the handshaking lines
-[x] Purchase magnetic sheet for shielding
-[x] Build board holder
-- Build SMD board
+- [ ] Add second controller
+- [ ] Add RS-422 transceiver and tie the handshaking lines
+- [x] Purchase magnetic sheet for shielding
+- [x] Build board holder
+- [ ] Build SMD board
